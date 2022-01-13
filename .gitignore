@@ -11,4 +11,3 @@ private/*
 certs/*
 **/certs/*
 intermediate/*
-!intermediate/openssl.cnf
