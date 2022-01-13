@@ -1,3 +1,4 @@
+# reference: https://www.golinuxcloud.com/openssl-create-certificate-chain-linux/
 
 SECRET ?= $(shell openssl rand -base64 32)
 KEYLEN ?= 4096
