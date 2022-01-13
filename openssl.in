@@ -1,26 +1,13 @@
-HOME                    = .
+HOME                    = $ROOT_DIR
 RANDFILE                = $ENV::HOME/.rnd
-XX = .
-
-oid_section             = new_oids
 
 openssl_conf = default_modules
-
-[ default_modules ]
-ssl_conf = ssl_module
-
-[ ssl_module ]
-system_default = crypto_policy
-
-[ crypto_policy ]
-
-[ new_oids ]
 
 [ ca ]
 default_ca      = CA_default
 
 [ CA_default ]
-dir = $XX
+dir = $HOME
 certs = $dir/certs
 database = $dir/index.txt
 new_certs_dir = $dir/certs
@@ -30,13 +17,11 @@ crlnumber = $dir/crlnumber
 private_key = $dir/private/cakey.pem
 name_opt = ca_default
 cert_opt = ca_default
-default_days = 1
-default_crl_days = 1
+default_days = 365
+default_crl_days = 30
 default_md = sha256
 preserve = no
 policy = policy_match
-
-x509_extensions = usr_cert
 
 [ policy_match ]
 countryName             = match
@@ -73,7 +58,7 @@ stateOrProvinceName_default     = YY
 localityName                    = Locality Name (eg, city)
 localityName_default            = ZZ
 0.organizationName              = Organization Name (eg, company)
-0.organizationName_default      = GoLinuxCloud
+0.organizationName_default      = ${ORG}
 organizationalUnitName          = Organizational Unit Name (eg, section)
 commonName                      = Common Name (eg, your name or your server\'s hostname)
 commonName_max                  = 64
@@ -88,6 +73,6 @@ basicConstraints = critical,CA:true
 [ v3_intermediate_ca ]
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid:always,issuer
-basicConstraints = critical, CA:true, pathlen:3
+basicConstraints = critical, CA:true, pathlen:${PATHLEN}
 keyUsage = critical, digitalSignature, cRLSign, keyCertSign
 
