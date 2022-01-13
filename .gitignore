@@ -1,0 +1,10 @@
+index*
+**/index*
+serial*
+**/serial*
+private/*
+**/private/*
+certs/*
+**/certs/*
+intermediate/*
+!intermediate/openssl.cnf
