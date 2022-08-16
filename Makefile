@@ -6,13 +6,13 @@ INTERMEDIATE_PATHLEN ?= 3
 CAROOT_DAYS ?= 3650
 DAYS ?= 365
 
-# 產生加密密碼檔案
+# step 1: 產生加密密碼檔案
 gen-secret-passwd:
 	echo $(SECRET) > secret
 	openssl enc -aes256 -salt -in secret -out secret.enc
 	rm secret
 
-# 初始化資料夾
+# step 2: 初始化資料夾
 init: init-intermediate
 	read -p 'organization name?' ORG; echo $$ORG > org
 	mkdir -p private certs
@@ -23,7 +23,8 @@ init: init-intermediate
 gen-caroot-config:
 	ORG=`cat org` \
 	ROOT_DIR=. \
-		envsubst '$$ROOT_DIR $$ORG' < openssl.in \
+	PATHLEN=$(INTERMEDIATE_PATHLEN) \
+		envsubst '$$ROOT_DIR $$ORG $$PATHLEN' < openssl.in \
 		> openssl.cnf
 
 # 初始化中繼CA資料夾
@@ -41,7 +42,7 @@ gen-intermediate-config:
 		envsubst '$$ROOT_DIR $$ORG $$PATHLEN' < openssl.in \
 		> intermediate/openssl.cnf
 
-# 使用加密密碼檔案產生根憑證用的密鑰
+# step 3: 使用加密密碼檔案產生根憑證用的密鑰
 gen-caroot-key:
 	openssl genrsa -des3 -passout file:secret.enc \
 		-out private/cakey.pem \
@@ -52,7 +53,7 @@ verify-caroot-key:
 	openssl rsa -noout -text -passin file:secret.enc \
 		-in private/cakey.pem 
 
-# 用根憑證密鑰自簽根憑證
+# step 4: 用根憑證密鑰自簽根憑證
 self-sign-caroot-cert:
 	openssl req -new -x509 -days $(CAROOT_DAYS) -passin file:secret.enc \
 		-config openssl.cnf \
@@ -63,11 +64,13 @@ self-sign-caroot-cert:
 # 驗證根憑證
 verify-caroot-cert:
 	openssl x509 -noout -text -in certs/cacert.pem
+	openssl verify -CAfile certs/cacert.pem certs/cacert.pem
 
-# 使用加密密碼檔案產生中繼憑證用密鑰
+# step 5: 使用加密密碼檔案產生中繼憑證用密鑰
 gen-intermediate-ca-key:
-	openssl genrsa -des3 -passout file:secret.enc \
-		-out intermediate/private/intermediate.cakey.pem \
+	openssl genrsa -des3 \
+		-passout file:secret.enc \
+		-out intermediate/private/cakey.pem \
 		$(KEYLEN)
 
 # 驗證中繼憑證密鑰
@@ -75,42 +78,79 @@ verify-intermediate-ca-key:
 	openssl rsa -noout -text -passin file:secret.enc \
 		-in intermediate/private/intermediate.cakey.pem
 
-# 使用加密密碼檔案並指定sha256算法產生Certificate Signing Request
+# step 6: 使用加密密碼檔案並指定sha256算法產生Certificate Signing Request
 gen-intermediate-ca-csr:
-	openssl req -new -sha256 -passin file:secret.enc \
+	openssl req -new -sha256 \
+		-passin file:secret.enc \
 		-config intermediate/openssl.cnf \
-		-key intermediate/private/intermediate.cakey.pem \
-		-out intermediate/csr/intermediate.csr.pem
+		-key intermediate/private/cakey.pem \
+		-out intermediate/csr/req.pem
 
-# 根憑證商簽署中繼憑證商的CSR
+# step 7: 根憑證商簽署中繼憑證商的CSR
 caroot-sign-intermediate-ca-csr:
-	openssl ca -notext -days $(DAYS) -passin file:secret.enc \
+	openssl ca -notext -days $(DAYS) \
+		-passin file:secret.enc \
 		-config openssl.cnf \
 		-extensions v3_intermediate_ca \
-		-in intermediate/csr/intermediate.csr.pem \
-		-out intermediate/certs/intermediate.cacert.pem
+		-in intermediate/csr/req.pem \
+		-out intermediate/certs/cacert.pem
 
 verify-intermediate-ca-cert:
 	openssl x509 -noout -text \
-		-in intermediate/certs/intermediate.cacert.pem
+		-in intermediate/certs/cacert.pem
 
 caroot-verify-intermediate-ca-cert:
-	openssl verify -CAfile certs/cacert.pem intermediate/certs/intermediate.cacert.pem
+	openssl verify -CAfile certs/cacert.pem intermediate/certs/cacert.pem
+
+# step 8: 產生憑證鏈
+gen-ca-chain-bundle:
+	cat intermediate/certs/cacert.pem certs/cacert.pem \
+		> intermediate/certs/ca-chain-bundle.pem
+
+# step 9: 產生service key
+gen-service-key:
+	read -p "service name? " svc; \
+	mkdir -p services/$$svc/private; \
+	openssl genrsa \
+		-out services/$$svc/private/key.pem \
+		$(KEYLEN)
+
+# step 10: 產生server csr
+gen-service-csr:
+	read -p "service name? " svc; \
+	mkdir -p services/$$svc/csr; \
+	openssl req -new -sha256 \
+		-key services/$$svc/private/key.pem \
+		-days $(DAYS) \
+		-subj /CN=$$svc \
+		-out services/$$svc/csr/req.pem
+
+# step 11: 簽署server cert
+intermediate-ca-sign-service-csr:
+	read -p "service name? " svc; \
+	mkdir -p services/$$svc/certs; \
+	openssl x509 -req -sha256 \
+		-CA intermediate/certs/ca-chain-bundle.pem \
+		-CAkey intermediate/private/cakey.pem \
+		-passin file:secret.enc \
+		-in services/$$svc/csr/req.pem \
+		-out services/$$svc/certs/$$svc.pem \
+		-CAcreateserial \
+		-days $(DAYS) \
+		-extfile server_cert_ext.cnf
 
 # 清除所有檔案(除了密碼檔)
 clear-all:
 	read -p 'clear all keys certs? (yes/N):' OK;\
 		if [ "$$OK" == "yes" ];\
 		then \
-			rm -f org \
+			rm -rf org \
 				index* \
 				serial* \
 				openssl.cnf \
-				private/* \
-				certs/* \
-				intermediate/{index,serial}* \
-				intermediate/openssl.cnf \
-				intermediate/crlnumber \
-				intermediate/{private,certs,csr}/* \
+				private \
+				certs \
+				intermediate \
+				services \
 				;\
 		fi
