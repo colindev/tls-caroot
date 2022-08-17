@@ -112,7 +112,7 @@ gen-service-key:
 	read -p "service name? " svc; \
 	mkdir -p services/$$svc/private; \
 	openssl genrsa \
-		-out services/$$svc/private/key.pem \
+		-out services/$$svc/private/$$svc.key \
 		$(KEYLEN)
 
 # step 10: 產生server csr
@@ -120,7 +120,7 @@ gen-service-csr:
 	read -p "service name? " svc; \
 	mkdir -p services/$$svc/csr; \
 	openssl req -new -sha256 \
-		-key services/$$svc/private/key.pem \
+		-key services/$$svc/private/$$svc.key \
 		-days $(DAYS) \
 		-subj /CN=$$svc \
 		-out services/$$svc/csr/req.pem
@@ -134,7 +134,7 @@ intermediate-ca-sign-service-csr:
 		-CAkey intermediate/private/cakey.pem \
 		-passin file:secret.enc \
 		-in services/$$svc/csr/req.pem \
-		-out services/$$svc/certs/$$svc.pem \
+		-out services/$$svc/certs/$$svc.cert \
 		-CAcreateserial \
 		-days $(DAYS) \
 		-extfile server_cert_ext.cnf
