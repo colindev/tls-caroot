@@ -98,8 +98,6 @@ caroot-sign-intermediate-ca-csr:
 verify-intermediate-ca-cert:
 	openssl x509 -noout -text \
 		-in intermediate/certs/cacert.pem
-
-caroot-verify-intermediate-ca-cert:
 	openssl verify -CAfile certs/cacert.pem intermediate/certs/cacert.pem
 
 # step 8: 產生憑證鏈
@@ -138,6 +136,12 @@ intermediate-ca-sign-service-csr:
 		-CAcreateserial \
 		-days $(DAYS) \
 		-extfile server_cert_ext.cnf
+
+verify-service-cert:
+	read -p "service name? " svc; \
+	openssl x509 -noout -text \
+		-in services/$$svc/certs/$$svc.cert; \
+	openssl verify -CAfile intermediate/certs/ca-chain-bundle.pem services/$$svc/certs/$$svc.cert
 
 # 清除所有檔案(除了密碼檔)
 clear-all:
