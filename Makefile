@@ -1,4 +1,5 @@
-# reference: https://www.golinuxcloud.com/openssl-create-certificate-chain-linux/
+# ref: https://www.golinuxcloud.com/openssl-create-certificate-chain-linux/
+# ref: https://www.openssl.org/docs/manmaster/man5/x509v3_config.html
 
 SECRET ?= $(shell openssl rand -base64 32)
 KEYLEN ?= 4096
